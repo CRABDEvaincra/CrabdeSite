@@ -16,8 +16,9 @@ const allowedOrigins = [
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:8000',
-  'https://crabde-site.netlify.app',
-
+  // Ajoutez votre domaine en production ici :
+  // 'https://votre-site.netlify.app',
+  // 'https://votre-site.vercel.app'
 ];
 
 const corsOptions = {
@@ -95,7 +96,7 @@ function validateScore(req, res, next) {
 // Rate limiting simple (sans bibliothèque externe)
 const requestCounts = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS = 5; // ⚠️ RÉDUIT de 10 à 5 pour plus de sécurité
+const MAX_REQUESTS = 20; // ⚠️ RÉDUIT de 10 à 5 pour plus de sécurité
 
 function rateLimiter(req, res, next) {
   const ip = req.ip || req.connection.remoteAddress;
@@ -292,5 +293,189 @@ process.on('SIGINT', () => {
     }
     console.log('Base de données fermée');
     process.exit(0);
+  });
+});
+
+// ========== ROUE DE LA CHANCE ==========
+
+// Table pour stocker les tentatives de la roue
+db.run(`
+  CREATE TABLE IF NOT EXISTS roue_tentatives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_identifier TEXT NOT NULL UNIQUE,
+    last_spin_date DATE NOT NULL,
+    total_spins INTEGER DEFAULT 1,
+    total_wins INTEGER DEFAULT 0,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`, (err) => {
+  if (err) {
+    console.error('Erreur création table roue_tentatives:', err);
+  } else {
+    console.log('✅ Table "roue_tentatives" prête');
+  }
+});
+
+// Route POST : Vérifier si l'utilisateur peut tourner
+app.post('/api/roue/check', rateLimiter, (req, res) => {
+  const { userIdentifier } = req.body;
+  
+  if (!userIdentifier || typeof userIdentifier !== 'string') {
+    return res.status(400).json({ error: 'Identifiant utilisateur manquant' });
+  }
+  
+  const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+  
+  db.get(
+    'SELECT * FROM roue_tentatives WHERE user_identifier = ?',
+    [userIdentifier],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: 'Erreur serveur' });
+      }
+      
+      if (!row) {
+        // Premier essai
+        return res.json({ 
+          canSpin: true, 
+          nextSpinDate: null,
+          totalSpins: 0,
+          totalWins: 0
+        });
+      }
+      
+      // Vérifier si c'est un nouveau jour
+      if (row.last_spin_date !== today) {
+        return res.json({ 
+          canSpin: true,
+          nextSpinDate: null,
+          totalSpins: row.total_spins,
+          totalWins: row.total_wins
+        });
+      }
+      
+      // Déjà joué aujourd'hui
+      const lastDate = new Date(row.last_spin_date);
+      const tomorrow = new Date(lastDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      res.json({ 
+        canSpin: false, 
+        nextSpinDate: tomorrow.toISOString(),
+        totalSpins: row.total_spins,
+        totalWins: row.total_wins
+      });
+    }
+  );
+});
+
+// Route POST : Tourner la roue
+app.post('/api/roue/spin', rateLimiter, (req, res) => {
+  const { userIdentifier } = req.body;
+  
+  if (!userIdentifier || typeof userIdentifier !== 'string') {
+    return res.status(400).json({ error: 'Identifiant utilisateur manquant' });
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Vérifier d'abord si l'utilisateur peut jouer
+  db.get(
+    'SELECT * FROM roue_tentatives WHERE user_identifier = ?',
+    [userIdentifier],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: 'Erreur serveur' });
+      }
+      
+      // Vérifier si déjà joué aujourd'hui
+      if (row && row.last_spin_date === today) {
+        return res.status(403).json({ 
+          error: 'Déjà joué aujourd\'hui',
+          canSpin: false 
+        });
+      }
+      
+      // Générer le résultat (1 chance sur 50)
+      const hasWon = Math.floor(Math.random() * 50) === 0;
+      
+      // Mettre à jour ou créer l'entrée
+      if (!row) {
+        // Première tentative
+        db.run(
+          'INSERT INTO roue_tentatives (user_identifier, last_spin_date, total_spins, total_wins) VALUES (?, ?, 1, ?)',
+          [userIdentifier, today, hasWon ? 1 : 0],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Erreur serveur' });
+            }
+            res.json({ 
+              hasWon, 
+              canSpin: false,
+              totalSpins: 1,
+              totalWins: hasWon ? 1 : 0
+            });
+          }
+        );
+      } else {
+        // Mise à jour
+        db.run(
+          'UPDATE roue_tentatives SET last_spin_date = ?, total_spins = total_spins + 1, total_wins = total_wins + ? WHERE user_identifier = ?',
+          [today, hasWon ? 1 : 0, userIdentifier],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Erreur serveur' });
+            }
+            res.json({ 
+              hasWon, 
+              canSpin: false,
+              totalSpins: row.total_spins + 1,
+              totalWins: row.total_wins + (hasWon ? 1 : 0)
+            });
+          }
+        );
+      }
+    }
+  );
+});
+
+// Route GET : Statistiques de la roue
+app.get('/api/roue/stats', rateLimiter, (req, res) => {
+  const queries = {
+    total: 'SELECT COUNT(*) as count FROM roue_tentatives',
+    totalSpins: 'SELECT SUM(total_spins) as total FROM roue_tentatives',
+    totalWins: 'SELECT SUM(total_wins) as total FROM roue_tentatives',
+    winRate: 'SELECT (CAST(SUM(total_wins) AS FLOAT) / SUM(total_spins)) * 100 as rate FROM roue_tentatives'
+  };
+  
+  const stats = {};
+  
+  Promise.all([
+    new Promise((resolve) => {
+      db.get(queries.total, (err, row) => {
+        stats.totalUsers = row ? row.count : 0;
+        resolve();
+      });
+    }),
+    new Promise((resolve) => {
+      db.get(queries.totalSpins, (err, row) => {
+        stats.totalSpins = row ? row.total : 0;
+        resolve();
+      });
+    }),
+    new Promise((resolve) => {
+      db.get(queries.totalWins, (err, row) => {
+        stats.totalWins = row ? row.total : 0;
+        resolve();
+      });
+    }),
+    new Promise((resolve) => {
+      db.get(queries.winRate, (err, row) => {
+        stats.winRate = row ? row.rate : 0;
+        resolve();
+      });
+    })
+  ]).then(() => {
+    res.json(stats);
   });
 });
