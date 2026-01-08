@@ -280,8 +280,8 @@ app.get('/api/resultats/export', rateLimiter, (req, res) => {
 // Démarrage du serveur
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
-  console.log(`📊 Stats disponibles sur http://localhost:${PORT}/api/stats`);
+  console.log(`🚀 Serveur démarré sur 'https://crabde-backend.onrender.com`);
+  console.log(`📊 Stats disponibles sur 'https://crabde-backend.onrender.com/api/stats`);
   console.log(`🛡️ Sécurité activée : Helmet + CORS + Rate Limiting`);
 });
 
