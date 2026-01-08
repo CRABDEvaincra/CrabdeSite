@@ -1,3 +1,5 @@
+require('dotenv').config(); // Charge les variables du fichier .env
+
 // server.js - Backend Express avec PostgreSQL
 const express = require('express');
 const { Pool } = require('pg'); // On utilise 'pg' au lieu de 'sqlite3'
@@ -15,7 +17,7 @@ const allowedOrigins = [
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'https://crabde-site.netlify.app', // Mettez l'URL de votre frontend Netlify
-  'https://votre-site.netlify.app'
+  
 ];
 
 app.use(cors({
