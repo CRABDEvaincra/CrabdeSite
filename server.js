@@ -2,9 +2,11 @@ require('dotenv').config(); // Charge les variables du fichier .env
 
 // server.js - Backend Express avec PostgreSQL
 const express = require('express');
-const { Pool } = require('pg'); // On utilise 'pg' au lieu de 'sqlite3'
+const { Pool } = require('pg');
 const cors = require('cors');
 const helmet = require('helmet');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 // ========== CONFIGURATION ==========
@@ -16,8 +18,7 @@ app.use(helmet({
 const allowedOrigins = [
   'http://localhost:5500',
   'http://127.0.0.1:5500',
-  'https://crabde-site.netlify.app', // Mettez l'URL de votre frontend Netlify
-  
+  'https://crabde-site.netlify.app',
 ];
 
 app.use(cors({
@@ -32,12 +33,47 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' }));
 
+// ========== CHARGEMENT DES LISTES DE VALIDATION ==========
+let associationsValides = [];
+let formationsValides = [];
+let colocsValides = [];
+let partisValides = [];
+
+try {
+  // Chargement des associations
+  const assosData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'assos.json'), 'utf8'));
+  associationsValides = assosData.associations ? assosData.associations.map(a => a.nom) : [];
+  
+  // Chargement des formations
+  const formationsData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'formations.json'), 'utf8'));
+  formationsValides = formationsData.formations ? formationsData.formations : [];
+  
+  // Chargement des colocs
+  const colocsData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'colocs.json'), 'utf8'));
+  colocsValides = colocsData.colocs ? colocsData.colocs : [];
+  
+  // Chargement des partis
+  const partisData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'partis.json'), 'utf8'));
+  partisValides = partisData.partis ? partisData.partis.map(p => p.nom) : [];
+  
+  console.log('✅ Listes de validation chargées:', {
+    associations: associationsValides.length,
+    formations: formationsValides.length,
+    colocs: colocsValides.length,
+    partis: partisValides.length
+  });
+} catch (err) {
+  console.error('⚠️ Erreur chargement listes validation:', err);
+  // Fallback sur des listes par défaut
+  partisValides = ['Poutou', 'Mélenchon', 'Tondelier', 'Hidalgo', 'Hollande',
+    'Valls', 'Macron', 'Sarkozy', 'Ciotti', 'Bardella', 'Zemmour', 'Ruffin', 'Darmanin'];
+}
+
 // ========== CONNEXION POSTGRESQL ==========
-// Render fournit l'URL via process.env.DATABASE_URL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // Nécessaire pour Render
+    rejectUnauthorized: false
   }
 });
 
@@ -79,30 +115,63 @@ initDatabase();
 // ========== ROUTES ==========
 
 // 1. Enregistrer un résultat
-// 1. Enregistrer un résultat
 app.post('/api/resultats', async (req, res) => {
   const { score, parti_proche, associations, formation, coloc } = req.body;
 
-  // ✅ VALIDATION DES DONNÉES
-  const partisValides = [
-    'Poutou', 'Mélenchon', 'Tondelier', 'Hidalgo', 'Hollande',
-    'Valls', 'Macron', 'Sarkozy', 'Ciotti', 'Bardella',
-    'Zemmour', 'Ruffin', 'Darmanin'
-  ];
-
-  // Vérifier que le parti est valide
+  // ✅ VALIDATION DU PARTI
   if (!parti_proche || !partisValides.includes(parti_proche)) {
+    console.log('❌ Tentative bloquée - Parti invalide:', parti_proche);
     return res.status(400).json({ 
       success: false, 
       error: 'Parti invalide ou manquant' 
     });
   }
 
-  // Vérifier que le score est un nombre entre 0 et 100
-  if (typeof score !== 'number' || score < 0 || score > 100) {
+  // ✅ VALIDATION DU SCORE
+  if (typeof score !== 'number' || score < 0 || score > 100 || isNaN(score)) {
+    console.log('❌ Tentative bloquée - Score invalide:', score);
     return res.status(400).json({ 
       success: false, 
       error: 'Score invalide (doit être entre 0 et 100)' 
+    });
+  }
+
+  // ✅ VALIDATION DES ASSOCIATIONS
+  if (associations) {
+    if (!Array.isArray(associations)) {
+      console.log('❌ Tentative bloquée - Associations pas un tableau');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Format associations invalide' 
+      });
+    }
+    
+    for (const asso of associations) {
+      if (associationsValides.length > 0 && !associationsValides.includes(asso)) {
+        console.log('❌ Tentative bloquée - Association invalide:', asso);
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Association invalide détectée' 
+        });
+      }
+    }
+  }
+
+  // ✅ VALIDATION DE LA FORMATION
+  if (formation && formationsValides.length > 0 && !formationsValides.includes(formation)) {
+    console.log('❌ Tentative bloquée - Formation invalide:', formation);
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Formation invalide' 
+    });
+  }
+
+  // ✅ VALIDATION DE LA COLOC
+  if (coloc && colocsValides.length > 0 && !colocsValides.includes(coloc)) {
+    console.log('❌ Tentative bloquée - Coloc invalide:', coloc);
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Coloc invalide' 
     });
   }
 
@@ -115,9 +184,10 @@ app.post('/api/resultats', async (req, res) => {
     const values = [score, parti_proche, JSON.stringify(associations), formation, coloc];
     
     const result = await pool.query(query, values);
+    console.log('✅ Résultat enregistré - ID:', result.rows[0].id);
     res.json({ success: true, id: result.rows[0].id });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Erreur serveur:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -132,7 +202,7 @@ app.get('/api/stats', async (req, res) => {
     stats.total = parseInt(basicStats.rows[0].count);
     stats.moyenne = parseFloat(basicStats.rows[0].moyenne) || 0;
 
-    // Distribution (Syntaxe PostgreSQL CASE)
+    // Distribution
     const distQuery = `
       SELECT 
         CASE 
@@ -194,14 +264,12 @@ app.post('/api/roue/check', async (req, res) => {
       return res.json({ canSpin: true, nextSpinDate: null });
     }
 
-    // Comparaison des dates (Postgres renvoie un objet Date)
     const lastDate = row.last_spin_date.toISOString().split('T')[0];
     
     if (lastDate !== today) {
       return res.json({ canSpin: true, nextSpinDate: null });
     }
 
-    // Calcul date demain
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
@@ -221,7 +289,6 @@ app.post('/api/roue/spin', async (req, res) => {
     const resDb = await pool.query('SELECT * FROM roue_tentatives WHERE user_identifier = $1', [userIdentifier]);
     const row = resDb.rows[0];
 
-    // Vérification date si l'utilisateur existe
     if (row) {
       const lastDate = row.last_spin_date.toISOString().split('T')[0];
       if (lastDate === today) {
@@ -233,13 +300,11 @@ app.post('/api/roue/spin', async (req, res) => {
     const winInc = hasWon ? 1 : 0;
 
     if (!row) {
-      // Premier insert
       await pool.query(
         'INSERT INTO roue_tentatives (user_identifier, last_spin_date, total_spins, total_wins) VALUES ($1, $2, 1, $3)',
         [userIdentifier, today, winInc]
       );
     } else {
-      // Update
       await pool.query(
         'UPDATE roue_tentatives SET last_spin_date = $1, total_spins = total_spins + 1, total_wins = total_wins + $2 WHERE user_identifier = $3',
         [today, winInc, userIdentifier]
