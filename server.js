@@ -79,8 +79,32 @@ initDatabase();
 // ========== ROUTES ==========
 
 // 1. Enregistrer un résultat
+// 1. Enregistrer un résultat
 app.post('/api/resultats', async (req, res) => {
   const { score, parti_proche, associations, formation, coloc } = req.body;
+
+  // ✅ VALIDATION DES DONNÉES
+  const partisValides = [
+    'Poutou', 'Mélenchon', 'Tondelier', 'Hidalgo', 'Hollande',
+    'Valls', 'Macron', 'Sarkozy', 'Ciotti', 'Bardella',
+    'Zemmour', 'Ruffin', 'Darmanin'
+  ];
+
+  // Vérifier que le parti est valide
+  if (!parti_proche || !partisValides.includes(parti_proche)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Parti invalide ou manquant' 
+    });
+  }
+
+  // Vérifier que le score est un nombre entre 0 et 100
+  if (typeof score !== 'number' || score < 0 || score > 100) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Score invalide (doit être entre 0 et 100)' 
+    });
+  }
 
   try {
     const query = `

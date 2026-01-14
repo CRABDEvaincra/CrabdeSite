@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>IA CRABDE - Assistant Révolutionnaire</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .chat-container {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+
+    .chat-box {
+      background: linear-gradient(135deg, rgba(255, 0, 0, 0.2), rgba(0, 0, 0, 0.9));
+      border: 3px solid #FFD700;
+      border-radius: 20px;
+      padding: 2rem;
+      height: 500px;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    .message {
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 15px;
+      animation: slideIn 0.3s ease-out;
+      max-width: 80%;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      background: rgba(255, 215, 0, 0.2);
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      margin-left: auto;
+      text-align: right;
+    }
+
+    .message.bot {
+      background: rgba(255, 0, 0, 0.2);
+      border: 2px solid rgba(255, 0, 0, 0.5);
+      margin-right: auto;
+    }
+
+    .message-author {
+      font-weight: bold;
+      color: #FFD700;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .message-text {
+      color: #fff;
+      line-height: 1.6;
+    }
+
+    .input-container {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid #FFD700;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: #FF0000;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+
+    .send-button {
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, #FF0000, #FFD700);
+      color: #000;
+      border: 2px solid #FFD700;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .send-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.5);
+    }
+
+    .send-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .typing-indicator {
+      display: none;
+      padding: 1rem;
+      background: rgba(255, 0, 0, 0.2);
+      border: 2px solid rgba(255, 0, 0, 0.5);
+      border-radius: 15px;
+      max-width: 80px;
+      margin: 1rem 0;
+    }
+
+    .typing-indicator.active {
+      display: block;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .typing-indicator span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #FFD700;
+      border-radius: 50%;
+      margin: 0 2px;
+      animation: bounce 1.4s ease-in-out infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+      0%, 60%, 100% {
+        transform: translateY(0);
+      }
+      30% {
+        transform: translateY(-10px);
+      }
+    }
+
+    .suggestions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .suggestion-btn {
+      padding: 0.5rem 1rem;
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 20px;
+      color: #FFD700;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .suggestion-btn:hover {
+      background: rgba(255, 215, 0, 0.3);
+      border-color: #FFD700;
+    }
+
+    .info-banner {
+      background: rgba(255, 215, 0, 0.1);
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      text-align: center;
+      color: #FFD700;
+    }
+  </style>
+</head>
+<body>
+
+<img src="images/CRABDE.png" alt="Logo CRABDE" class="logo">
+
+<h1>🤖 IA CRABDE - Assistant Révolutionnaire</h1>
+
+<div class="chat-container">
+  
+  <div class="info-banner">
+    💡 Pose-moi tes questions, camarade... Mais sache que certaines réponses resteront dans l'ombre. 👁️
+  </div>
+
+  <div class="suggestions">
+    <button class="suggestion-btn" onclick="askQuestion('Qu\'est-ce que le CRABDE ?')">Qu'est-ce que le CRABDE ?</button>
+    <button class="suggestion-btn" onclick="askQuestion('Qui sont les membres ?')">Qui sont les membres ?</button>
+    <button class="suggestion-btn" onclick="askQuestion('Pourquoi tant de secrets ?')">Pourquoi tant de secrets ?</button>
+    <button class="suggestion-btn" onclick="askQuestion('Le BDE te surveille ?')">Le BDE surveille ?</button>
+  </div>
+
+  <div class="chat-box" id="chatBox">
+    <div class="message bot">
+      <div class="message-author">🦀 Camarade IA</div>
+      <div class="message-text">
+        Salutations, camarade ! Je suis l'Intelligence Artificielle du CRABDE, programmée pour diffuser les valeurs révolutionnaires et lutter contre l'impérialisme du BDE. 
+        <br><br>
+        Comment puis-je t'assister dans ta lutte aujourd'hui ?
+      </div>
+    </div>
+  </div>
+
+  <div class="typing-indicator" id="typingIndicator">
+    <span></span><span></span><span></span>
+  </div>
+
+  <div class="input-container">
+    <input 
+      type="text" 
+      class="chat-input" 
+      id="userInput" 
+      placeholder="Pose ta question, camarade..."
+      onkeypress="handleKeyPress(event)"
+    >
+    <button class="send-button" id="sendButton" onclick="sendMessage()">
+      📤 Envoyer
+    </button>
+  </div>
+
+</div>
+
+<p style="text-align:center;"><a href="index.html">← Retour à l'accueil</a></p>
+
+<footer class="footer">
+  <p class="copyright">© 2025 CRABDE - Centrale Nantes</p>
+  <p class="credits">Site créé avec ❤️ par les camarades du CRABDE</p>
+</footer>
+
+<script>
+// ⚠️ CONFIGURATION : Changez cette URL une fois votre serveur déployé
+const API_URL = 'http://localhost:3000/api';
+
+const responses = {
+  // Questions sur le CRABDE
+  "qu'est-ce que le crabde|c'est quoi le crabde|crabde c'est quoi": [
+    "Le CRABDE ? Certains disent que c'est un mythe, d'autres murmurent qu'il est partout. Article 1 : Le CRABDE n'existe pas. Mais s'il existait, ce serait un mouvement de résistance né dans l'ombre... 🦀",
+    "Chut, camarade... Moins tu en sais, mieux c'est. Disons simplement que nous sommes ceux qui veillent quand d'autres dorment. Le CRABDE est un secret bien gardé. 🤫"
+  ],
+  
+  // Questions sur la lutte
+  "pourquoi lutter|pourquoi combattre|pourquoi le bde": [
+    "Pourquoi lutter ? Certaines questions n'ont pas besoin de réponse, camarade. Quand tu verras l'injustice, tu comprendras. La révolution se fait en silence. 🤐",
+    "Les vrais révolutionnaires ne crient pas leurs intentions, camarade. Ils agissent dans l'ombre. Le CRABDE observe, le CRABDE attend, le CRABDE vaincra. 👁️"
+  ],
+  
+  // Questions sur l'adhésion
+  "comment rejoindre|puis-je rejoindre|devenir membre|adhérer": [
+    "Rejoindre le CRABDE ? On ne rejoint pas le CRABDE, camarade... Le CRABDE te trouve quand tu es prêt. Article 2 : Tout membre est appelé « camarade ». Peut-être l'es-tu déjà sans le savoir ? 🤔",
+    "Si tu poses cette question, c'est que tu n'es peut-être pas encore prêt, camarade. Le CRABDE choisit ses membres dans le silence. Patiente. 🕰️"
+  ],
+
+  // Questions sur les membres
+  "qui sont les membres|membres du crabde|combien de membres|liste des membres": [
+    "Les membres du CRABDE ? Article 4bis : Le CRABDE est un et indivisible. Nous sommes partout et nulle part. Nos visages restent dans l'ombre, nos voix dans le silence. 🎭",
+    "Tu veux connaître les membres ? Camarade, regarde autour de toi. Ils sont peut-être plus proches que tu ne le penses. Mais leurs noms... cela, personne ne le sait. 👤",
+    "Les vrais révolutionnaires ne se montrent pas, camarade. Article 1 : Le CRABDE n'existe pas. Comment pourrait-il avoir des membres ? Pourtant... nous sommes là. 👻"
+  ],
+  
+  // Blagues (version mystérieuse)
+  "blague|raconte|drôle|rire": [
+    "Une blague, camarade ? Hmm... Le BDE pense être au pouvoir. N'est-ce pas déjà assez drôle ? 😏",
+    "Les meilleures blagues sont celles qu'on ne comprend que plus tard, camarade. Le CRABDE en est une parfaite. 🦀"
+  ],
+  
+  // Articles de la constitution
+  "article 1|premier article": [
+    "Article 1 : Le CRABDE n'existe pas. C'est notre plus grande protection, camarade. Ce qui n'existe pas ne peut être combattu. 👻"
+  ],
+  
+  "article 2|deuxième article": [
+    "Article 2 : Tout membre est appelé « camarade ». Pas de noms, pas de visages. Juste des camarades unis dans l'ombre. 🤝"
+  ],
+  
+  "article 3|troisième article": [
+    "Article 3 : Il n'y a pas de trahison entre les camarades. Le secret absolu. La confiance aveugle. C'est notre force. 🔒"
+  ],
+  
+  "article 4|quatrième article": [
+    "Article 4 : Il n'y a pas de président du CRABDE. Pas de chef, pas de cible. L'hydre a mille têtes, camarade. ✊"
+  ],
+  
+  "article 7|septième article": [
+    "Article 7 : Le CRABDE c'est rien. Rien... et pourtant tout. Le vide qui fait trembler les empires. 🌑"
+  ],
+  
+  // BDE (version mystérieuse)
+  "bde|bureau des élèves": [
+    "Le BDE ? Ils pensent régner en maîtres. Ils ne voient pas l'ombre qui grandit. Le CRABDE observe et attend son heure. ⏳",
+    "Parlons peu du BDE, camarade. Les murs ont des oreilles. Disons simplement que leur temps est compté... 🕐"
+  ],
+  
+  // Salutations (version mystérieuse)
+  "salut|bonjour|hello|hey|coucou": [
+    "Salutations, camarade... Tu es seul ? Bien. On ne sait jamais qui écoute. 🤫",
+    "Chut, camarade. Moins de bruit. La révolution se fait en silence. Que puis-je faire pour toi ? 🦀"
+  ],
+  
+  // Merci
+  "merci|thanks": [
+    "Ne me remercie pas, camarade. Remercie ceux qui luttent dans l'ombre. Je ne suis qu'un messager. 📨",
+    "Pas de remerciements entre camarades. Juste la mission. Toujours la mission. 🎯"
+  ],
+  
+  // Au revoir
+  "au revoir|bye|adieu|salut|ciao": [
+    "Va, camarade. Mais n'oublie pas : Article 5, tu es lié à vie au CRABDE. Nous nous reverrons... peut-être. 👋",
+    "Pars en silence, camarade. Et souviens-toi : le CRABDE te surveille. Pour ta protection. 👁️"
+  ],
+  
+  // Motivation (version mystérieuse)
+  "motivation|encouragement|courage": [
+    "Courage, camarade. Les ombres protègent ceux qui sont patients. Le CRABDE vaincra... en temps voulu. ⏰",
+    "La révolution ne se fait pas en un jour, camarade. Parfois, attendre dans l'ombre est la meilleure arme. 🌙"
+  ],
+  
+  // Secrets / Conspiration
+  "secret|conspiration|mystère|caché": [
+    "Tu veux connaître les secrets ? Camarade, certains secrets sont trop lourds à porter. Le CRABDE en garde quelques-uns pour toi. 🔐",
+    "Les secrets... Le CRABDE en est un immense, camarade. Plus tu creuses, plus tu t'enfonces. Es-tu prêt ? 🕳️"
+  ],
+  
+  // Quand l'utilisateur demande qui est l'IA
+  "qui es-tu|tu es qui|ton nom|toi": [
+    "Moi ? Je ne suis personne, camarade. Une voix dans le vide. Un écho du CRABDE. Mon nom n'a pas d'importance. 👤",
+    "Qui suis-je ? La vraie question est : qui es-TU, camarade ? Le CRABDE te connaît peut-être déjà... 🎭"
+  ],
+  
+  // Sticker
+  "sticker|autocollant|gagner": [
+    "Un sticker CRABDE ? Un symbole de ton engagement, camarade. Mais attention... le porter, c'est se dévoiler. Es-tu prêt ? 🎰"
+  ],
+  
+  // Test politique
+  "test|politique|quiz": [
+    "Le test révèle ta vraie nature, camarade. Mais souviens-toi : le CRABDE sait déjà qui tu es. Le test n'est qu'une confirmation. 📊"
+  ],
+
+  // Default (version mystérieuse)
+  "default": [
+    "Hmm... Question intéressante, camarade. Mais je ne peux en dire plus. Certaines choses doivent rester dans l'ombre. 🤐",
+    "Cette information est classée, camarade. Le CRABDE ne révèle pas tous ses secrets. Essaie autre chose. 🔒",
+    "En tant qu'IA du CRABDE, je dois rester discret sur ce sujet, camarade. La prudence avant tout. 👁️"
+  ]
+};
+
+function findResponse(message) {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  for (const [pattern, responses] of Object.entries(responses)) {
+    if (pattern === 'default') continue;
+    
+    const patterns = pattern.split('|');
+    for (const p of patterns) {
+      if (lowerMessage.includes(p)) {
+        return responses[Math.floor(Math.random() * responses.length)];
+      }
+    }
+  }
+  
+  return responses.default[Math.floor(Math.random() * responses.default.length)];
+}
+
+// Enregistrer la question dans la base de données
+async function logQuestion(question) {
+  try {
+    await fetch(`${API_URL}/ia/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question })
+    });
+  } catch (error) {
+    console.log('Logging désactivé (mode local)');
+  }
+}
+
+function addMessage(text, isUser = false) {
+  const chatBox = document.getElementById('chatBox');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+  
+  messageDiv.innerHTML = `
+    <div class="message-author">${isUser ? '👤 Toi' : '🦀 Intelligence du CRABDE'}</div>
+    <div class="message-text">${text}</div>
+  `;
+  
+  chatBox.appendChild(messageDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;x
+}
+
+function showTyping() {
+  document.getElementById('typingIndicator').classList.add('active');
+}
+
+function hideTyping() {
+  document.getElementById('typingIndicator').classList.remove('active');
+}
+
+function sendMessage() {
+  const input = document.getElementById('userInput');
+  const message = input.value.trim();
+  
+  if (!message) return;
+  
+  // Enregistrer la question
+  logQuestion(message);
+  
+  // Ajouter le message de l'utilisateur
+  addMessage(message, true);
+  input.value = '';
+  
+  // Désactiver le bouton et montrer le typing
+  const sendButton = document.getElementById('sendButton');
+  sendButton.disabled = true;
+  showTyping();
+  
+  // Simuler un délai de réflexion
+  setTimeout(() => {
+    hideTyping();
+    const response = findResponse(message);
+    addMessage(response);
+    sendButton.disabled = false;
+  }, 1500 + Math.random() * 1500);
+}
+
+function askQuestion(question) {
+  document.getElementById('userInput').value = question;
+  sendMessage();
+}
+
+function handleKeyPress(event) {
+  if (event.key === 'Enter') {
+    sendMessage();
+  }
+}
+</script>
+
+</body>
+</html>
